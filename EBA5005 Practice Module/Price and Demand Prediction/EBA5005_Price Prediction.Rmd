@@ -1,0 +1,232 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+# install and library necessary packages
+install.packages('glmnet')
+install.packages('tree')
+install.packages("randomForest")
+install.packages('gbm')
+library(glmnet)
+library(tree)
+library(randomForest)
+library(gbm)
+
+# import data
+condos = read.csv('/Users/Ivan Junqi Wu/Desktop/Graguate/Specialist Modules/Specialized Predictive Modelling & Forecasting/Practice Module/Price Estimation & Demand Curve/Codes/highlevelcondos.csv')
+
+# factorize categorical variables
+condos$floor = as.factor(condos$floor)
+condos$buildingtype = as.factor(condos$buildingtype)
+condos$renovation = as.factor(condos$renovation)
+condos$ buildingstructure = as.factor(condos$buildingstructure)
+condos$elevator = as.factor(condos$elevator)
+condos$subway = as.factor(condos$subway)
+
+# determine response variables and independent variables
+x = model.matrix(pricepersquare ~ ., condos)[, -1]
+View(x)
+y = condos$pricepersquare
+
+# split data into training dataset and testing dataset
+set.seed(666)
+index = sort(sample(nrow(condos), nrow(condos) * 0.7))
+x_train = x[index,]
+x_test = x[-index,]
+y_train = y[index]
+y_test = y[-index]
+
+# modelling-ridge
+grid =  10^seq(10, -2, length = 100)
+ridge_model = glmnet(x, y, alpha = 0, lambda = grid)
+dim(coef(ridge_model))
+
+plot(ridge_model, xvar="lambda",label=TRUE)
+
+# find the best lambda by cross validation
+set.seed(666)
+cv_out = cv.glmnet(x_train, y_train, alpha = 0)
+plot(cv_out)
+
+best_lambda = cv_out$lambda.1se
+best_lambda
+
+ridge_model = glmnet(x_train, y_train, alpha = 0, lambda = grid)
+ridge_pred = predict(ridge_model, s = best_lambda,
+                      newx = x_test)
+mean((ridge_pred - y_test)^2)
+
+out = glmnet(x, y, alpha = 0, lambda=grid) 
+
+predict(out, type = "coefficients", s = best_lambda)
+ridge_coef = predict(out, type = 'coefficients', s = best_lambda)
+ridge_coef
+
+# modelling-log(ridge)
+grid =  10^seq(10, -2, length = 100)
+ridge_model_log = glmnet(x, log(y), alpha = 0, lambda = grid)
+dim(coef(ridge_model_log))
+
+plot(ridge_model_log, xvar="lambda",label=TRUE)
+
+# find the best lambda by cross validation
+set.seed(666)
+cv_out = cv.glmnet(x_train, log(y_train), alpha = 0)
+plot(cv_out)
+
+best_lambda = cv_out$lambda.1se
+best_lambda
+
+ridge_model_log = glmnet(x_train, log(y_train), alpha = 0, lambda = grid)
+ridge_pred_log = predict(ridge_model_log, s = best_lambda,
+                      newx = x_test)
+mean((ridge_pred_log - y_test)^2)
+
+out = glmnet(x, log(y), alpha = 0, lambda=grid) 
+
+predict(out, type = "coefficients", s = best_lambda)
+ridge_coef_log = predict(out, type = 'coefficients', s = best_lambda)
+ridge_coef_log
+
+
+# modelling-lasso
+grid =  10^seq(10, -2, length = 100)
+lasso_model = glmnet(x, y, alpha = 1, lambda = grid)
+dim(coef(lasso_model))
+
+plot(lasso_model, xvar="lambda",label=TRUE)
+
+# find the best lambda by cross validation
+set.seed(666)
+cv_out = cv.glmnet(x_train, y_train, alpha = 1)
+plot(cv_out)
+
+best_lambda = cv_out$lambda.1se
+best_lambda
+
+lasso_model = glmnet(x_train, y_train, alpha = 1, lambda = grid)
+lasso_pred = predict(lasso_model, s = best_lambda,
+                      newx = x_test)
+mean((lasso_pred - y_test)^2)
+
+out = glmnet(x, y, alpha = 1, lambda=grid) 
+
+predict(out, type = "coefficients", s = best_lambda)
+lasso.coef = predict(out, type = 'coefficients', s = best_lambda)
+lasso.coef
+lasso.coef[lasso.coef!=0]
+
+# modelling-log(lasso)
+grid =  10^seq(10, -2, length = 100)
+lasso_model_log = glmnet(x, log(y), alpha = 1, lambda = grid)
+dim(coef(lasso_model_log))
+
+plot(lasso_model_log, xvar="lambda",label=TRUE)
+
+# find the best lambda by cross validation
+set.seed(666)
+cv_out = cv.glmnet(x_train, log(y_train), alpha = 1)
+plot(cv_out)
+
+best_lambda = cv_out$lambda.1se
+best_lambda
+
+lasso_model_log = glmnet(x_train, log(y_train), alpha = 1, lambda = grid)
+lasso_pred_log = predict(lasso_model_log, s = best_lambda,
+                      newx = x_test)
+mean((lasso_pred_log - y_test)^2)
+
+out = glmnet(x, log(y), alpha = 1, lambda=grid) 
+
+predict(out, type = "coefficients", s = best_lambda)
+lasso.coef_log = predict(out, type = 'coefficients', s = best_lambda)
+lasso.coef_log
+lasso.coef_log[lasso.coef_log!=0]
+-------------------------------------------------------------------------------
+# split data into training dataset and tesing dataset
+set.seed(666)
+index = sort(sample(nrow(condos), nrow(condos) * 0.7))
+train = condos[index,]
+test = condos[-index,]
+
+# modelling-tree-based
+tree_condos = tree(pricepersquare ~ ., train )
+summary(tree_condos)
+plot(tree_condos)
+text(tree_condos, pretty = 0)
+
+# find the best number of trees by cross validation 
+cv_condos = cv.tree(tree_condos)
+plot(cv_condos$size, cv_condos$dev, type = "b")
+
+prune_condos = prune.tree(tree_condos, best = 3)
+plot(prune_condos)
+text(prune_condos, pretty = 0)
+
+price_predict = predict(prune_condos, newdata = test)
+condos_test = test$pricepersquare
+plot(price_predict, condos_test)
+abline(0, 1)
+mean((price_predict - condos_test)^2)
+
+
+# Bagging
+set.seed(666)
+bag_condos1 = randomForest(pricepersquare ~ .,  train, mtry = 12, importance = TRUE)
+bag_condos1
+
+price_predict_bag1 = predict(bag_condos1, newdata = test)
+condos_test = test$pricepersquare
+plot(price_predict_bag1, condos_test)
+abline(0,1)
+
+mean((price_predict_bag1 - condos_test)^2)
+
+# check the importance of factors
+importance(bag_condos1)
+varImpPlot(bag_condos1)
+
+set.seed(666)
+bag_condos2 = randomForest(pricepersquare ~ .,  train, mtry = 6, importance = TRUE)
+bag_condos2
+
+price_predict_bag2 = predict(bag_condos2, newdata = test)
+condos_test = test$pricepersquare
+plot(price_predict_bag2, condos_test)
+abline(0,1)
+
+mean((price_predict_bag2 - condos_test)^2)
+
+# check the importance of factors
+importance(bag_condos2)
+varImpPlot(bag_condos2)
+
+set.seed(666)
+bag_condos3 = randomForest(pricepersquare ~ .,  train, importance = TRUE)
+bag_condos3
+
+price_predict_bag3 = predict(bag_condos3, newdata = test)
+condos_test = test$pricepersquare
+plot(price_predict_bag3, condos_test)
+abline(0,1)
+
+mean((price_predict_bag3 - condos_test)^2)
+
+# check the importance of factors
+importance(bag_condos3)
+varImpPlot(bag_condos3)
+
+# Boosting
+set.seed(666)
+boost_condos = gbm(pricepersquare ~ ., data = train,
+    distribution = "gaussian", n.trees = 5000,
+    interaction.depth = 4)
+summary(boost_condos)
+
+# check the change of price with change of area
+plot(boost_condos, i = "area")
+
+price_predict_boost = predict(boost_condos,
+    newdata = test, n.trees = 5000)
+condos_test = test$pricepersquare
+mean((price_predict_boost - condos_test)^2)
